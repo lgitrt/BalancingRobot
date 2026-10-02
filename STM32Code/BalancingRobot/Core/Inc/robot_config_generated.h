@@ -1,0 +1,26 @@
+/* Author: Luca Obwegs */
+/* Generated from simulation/config/mechanical.json; do not edit by hand. */
+#ifndef ROBOT_CONFIG_GENERATED_H
+#define ROBOT_CONFIG_GENERATED_H
+
+#define ROBOT_CONTROL_HZ 500.0f
+#define ROBOT_WHEEL_RADIUS_M 0.04f
+#define ROBOT_WHEEL_SEPARATION_M 0.18f
+#define ROBOT_STEP_ANGLE_DEG 1.8f
+#define ROBOT_MICROSTEPS 16.0f
+#define ROBOT_GEAR_RATIO 1.0f
+#define ROBOT_MAX_SPEED_M_S 0.8f
+#define ROBOT_MAX_ACCEL_M_S2 4.0f
+#define ROBOT_MAX_STEP_RATE_HZ 20000.0f
+#define ROBOT_FALL_ANGLE_RAD 0.7f
+#define ROBOT_PID_PITCH_KP 250.0f
+#define ROBOT_PID_PITCH_KI 0.0f
+#define ROBOT_PID_PITCH_KD 5.0f
+#define ROBOT_PID_VELOCITY_KP 2.0f
+#define ROBOT_PID_POSITION_KP 1.0f
+#define ROBOT_LQR_K_POSITION -3.53553391f
+#define ROBOT_LQR_K_VELOCITY -4.87865835f
+#define ROBOT_LQR_K_PITCH -39.3487885f
+#define ROBOT_LQR_K_PITCH_RATE -6.29498859f
+
+#endif

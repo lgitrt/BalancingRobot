@@ -1,0 +1,27 @@
+{
+  "PID": {
+    "pitch_rms_deg": 4.461680573742171,
+    "peak_pitch_deg": 6.51755722612056,
+    "position_rms_m": 0.2564145000028075,
+    "step_position_error_final_m": 0.023573436020392136,
+    "fallen": false,
+    "simulated_duration_s": 8.0
+  },
+  "LQR": {
+    "pitch_rms_deg": 1.3577362539353306,
+    "peak_pitch_deg": 5.5437515731118525,
+    "position_rms_m": 0.06424503750359359,
+    "step_position_error_final_m": -0.003534240381811951,
+    "fallen": false,
+    "simulated_duration_s": 8.0
+  },
+  "author": "Luca Obwegs",
+  "design": {
+    "lqr_gain": [
+      -3.535533905932697,
+      -4.878658346639474,
+      -39.3487885328077,
+      -6.294988594404548
+    ]
+  }
+}

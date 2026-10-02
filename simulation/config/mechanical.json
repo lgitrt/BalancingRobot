@@ -1,0 +1,50 @@
+{
+  "author": "Luca Obwegs",
+  "robot": {
+    "chassis_mass_kg": 0.8,
+    "chassis_com_height_m": 0.12,
+    "chassis_inertia_kg_m2": {
+      "ixx": 0.008,
+      "iyy": 0.006,
+      "izz": 0.008
+    },
+    "chassis_size_m": [0.12, 0.10, 0.18],
+    "wheel_mass_kg": 0.12,
+    "wheel_radius_m": 0.04,
+    "wheel_width_m": 0.02,
+    "wheel_separation_m": 0.18,
+    "wheel_axial_inertia_kg_m2": 0.0002,
+    "wheel_transverse_inertia_kg_m2": 0.00012,
+    "initial_pitch_rad": 0.0,
+    "initial_forward_speed_m_s": 0.0,
+    "wheel_step_angle_deg": 1.8,
+    "microsteps": 16,
+    "gear_ratio": 1.0,
+    "max_wheel_speed_m_s": 0.8,
+    "max_wheel_accel_m_s2": 4.0,
+    "motor_time_constant_s": 0.035,
+    "motor_step_rate_limit_hz": 20000.0,
+    "pitch_damping_n_m_s": 0.06,
+    "wheel_ground_friction": 1.0,
+    "wheel_ground_friction_lateral": 0.8,
+    "steps_lost_fraction": 0.0,
+    "fall_angle_rad": 0.70,
+    "pitch_axis": "y",
+    "pitch_sign": 1.0,
+    "left_motor_sign": 1.0,
+    "right_motor_sign": 1.0
+  },
+  "control": {
+    "loop_hz": 500.0,
+    "lqr_q": [10.0, 2.0, 180.0, 12.0],
+    "lqr_r": 0.8,
+    "pid": {
+      "pitch_kp": 250.0,
+      "pitch_ki": 0.0,
+      "pitch_kd": 5.0,
+      "velocity_kp": 2.0,
+      "position_kp": 1.0
+    },
+    "command_timeout_s": 0.5
+  }
+}
