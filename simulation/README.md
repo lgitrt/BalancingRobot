@@ -83,6 +83,13 @@ the four measurements are signed integers scaled by 1e-4. Fault lines begin
 with `FAULT,`. Verify IMU axis/sign while the drivers remain disabled before
 sending `arm`. The software arm is not an emergency stop.
 
+If startup fails, the UART reports a specific `FAULT,<stage>` instead of a
+generic `FAULT,init`. `imu_no_ack` means the IMU did not respond at the
+configured I2C address; `imu_id,0xNN` reports the WHO_AM_I value read
+(expected `0x68` for LSM6DS0); `imu_config` or `imu_calibration` indicates
+the corresponding I2C setup/read failed. `pwm_right`, `pwm_left`, `uart_rx`,
+and `tim6` identify the other initialization checks.
+
 For a bounded hardware check, securely raise the robot so both wheels are
 clear of the floor, keep clear of the wheels, and send `test` while the robot
 is disarmed and held within about 0.15 rad of its calibrated upright angle.

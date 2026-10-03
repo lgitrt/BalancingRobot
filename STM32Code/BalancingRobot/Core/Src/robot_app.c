@@ -105,9 +105,19 @@ static uint32_t diagnostic_phase_ticks;
 static uint32_t diagnostic_report_ticks;
 static uint8_t fault_reported;
 static const char *fault_reason = "init";
+static uint8_t imu_who_am_i;
 
 static void motors_disable(void);
 static void send_diagnostic_event(void);
+
+static void latch_init_fault(const char *reason)
+{
+  if (!application_fault)
+  {
+    application_fault = 1U;
+    fault_reason = reason;
+  }
+}
 
 static uint16_t read_i16_le(const uint8_t *data)
 {
@@ -147,10 +157,14 @@ static HAL_StatusTypeDef imu_read_vector(uint8_t reg, int16_t vector[3])
 
 static HAL_StatusTypeDef imu_initialize_and_calibrate(void)
 {
-  uint8_t who_am_i = 0U;
-  if (imu_read_register(LSM6DS0_REG_WHO_AM_I, &who_am_i) != HAL_OK ||
-      who_am_i != LSM6DS0_WHO_AM_I_VALUE)
+  if (imu_read_register(LSM6DS0_REG_WHO_AM_I, &imu_who_am_i) != HAL_OK)
   {
+    fault_reason = "imu_no_ack";
+    return HAL_ERROR;
+  }
+  if (imu_who_am_i != LSM6DS0_WHO_AM_I_VALUE)
+  {
+    fault_reason = "imu_id";
     return HAL_ERROR;
   }
 
@@ -161,6 +175,7 @@ static HAL_StatusTypeDef imu_initialize_and_calibrate(void)
       imu_write_register(LSM6DS0_REG_CTRL_REG6_XL, 0xE0U) != HAL_OK ||
       imu_write_register(LSM6DS0_REG_CTRL_REG8, 0x44U) != HAL_OK)
   {
+    fault_reason = "imu_config";
     return HAL_ERROR;
   }
 
@@ -173,6 +188,7 @@ static HAL_StatusTypeDef imu_initialize_and_calibrate(void)
     if (imu_read_vector(LSM6DS0_REG_OUT_X_L_G, gyro) != HAL_OK ||
         imu_read_vector(LSM6DS0_REG_OUT_X_L_XL, accel) != HAL_OK)
     {
+      fault_reason = "imu_calibration";
       return HAL_ERROR;
     }
     gyro_sum += (float)gyro[1] * 0.015258789f * DEG_TO_RAD;
@@ -690,7 +706,7 @@ HAL_StatusTypeDef Robot_App_Init(void)
   }
   else
   {
-    application_fault = 1U;
+    latch_init_fault("pwm_right");
   }
   if (HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1) == HAL_OK)
   {
@@ -698,25 +714,41 @@ HAL_StatusTypeDef Robot_App_Init(void)
   }
   else
   {
-    application_fault = 1U;
+    latch_init_fault("pwm_left");
   }
 
   if (!application_fault && imu_initialize_and_calibrate() != HAL_OK)
   {
-    application_fault = 1U;
+    latch_init_fault(fault_reason);
   }
   if (HAL_UART_Receive_IT(&hlpuart1, &uart_rx_byte, 1U) != HAL_OK)
   {
-    application_fault = 1U;
+    latch_init_fault("uart_rx");
   }
   if (HAL_TIM_Base_Start_IT(&htim6) != HAL_OK)
   {
-    application_fault = 1U;
+    latch_init_fault("tim6");
   }
   if (application_fault)
   {
+    char init_fault_message[40];
     motors_disable();
-    (void)HAL_UART_Transmit(&hlpuart1, (uint8_t *)"FAULT,init\r\n", 12U, 50U);
+    int length;
+    if (strcmp(fault_reason, "imu_id") == 0)
+    {
+      length = snprintf(init_fault_message, sizeof(init_fault_message),
+                        "FAULT,imu_id,0x%02X\r\n", imu_who_am_i);
+    }
+    else
+    {
+      length = snprintf(init_fault_message, sizeof(init_fault_message),
+                        "FAULT,%s\r\n", fault_reason);
+    }
+    if (length > 0 && (size_t)length < sizeof(init_fault_message))
+    {
+      (void)HAL_UART_Transmit(&hlpuart1, (uint8_t *)init_fault_message,
+                              (uint16_t)length, 100U);
+    }
     fault_reported = 1U;
   }
   return application_fault ? HAL_ERROR : HAL_OK;
