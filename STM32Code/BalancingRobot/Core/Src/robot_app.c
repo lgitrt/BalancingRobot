@@ -549,7 +549,7 @@ static void send_diagnostic_event(void)
   switch (diagnostic_event)
   {
   case ROBOT_DIAGNOSTIC_EVENT_STARTED:
-    message = "TEST,START,step_hz=100,phase_ms=500\r\n";
+    message = "TEST,START,step_hz=400,phase_ms=1000\r\n";
     break;
   case ROBOT_DIAGNOSTIC_EVENT_FAULTED:
     message = "TEST,FAULTED\r\n";
