@@ -34,6 +34,26 @@ typedef enum
   ROBOT_CONTROLLER_LQR
 } RobotController_t;
 
+typedef enum
+{
+  ROBOT_DIAGNOSTIC_IDLE = 0,
+  ROBOT_DIAGNOSTIC_LEFT_FORWARD,
+  ROBOT_DIAGNOSTIC_LEFT_REVERSE,
+  ROBOT_DIAGNOSTIC_RIGHT_FORWARD,
+  ROBOT_DIAGNOSTIC_RIGHT_REVERSE
+} RobotDiagnosticStage_t;
+
+typedef enum
+{
+  ROBOT_DIAGNOSTIC_EVENT_NONE = 0,
+  ROBOT_DIAGNOSTIC_EVENT_STARTED,
+  ROBOT_DIAGNOSTIC_EVENT_FAULTED,
+  ROBOT_DIAGNOSTIC_EVENT_REJECTED_ARMED,
+  ROBOT_DIAGNOSTIC_EVENT_CANCELLED,
+  ROBOT_DIAGNOSTIC_EVENT_REJECTED_TILT,
+  ROBOT_DIAGNOSTIC_EVENT_COMPLETE
+} RobotDiagnosticEvent_t;
+
 typedef struct
 {
   TIM_HandleTypeDef *timer;
@@ -62,6 +82,8 @@ static volatile float requested_forward_speed;
 static volatile float requested_turn_rate;
 static volatile uint32_t last_command_tick;
 static volatile uint8_t robot_armed;
+static volatile RobotDiagnosticStage_t diagnostic_stage;
+static volatile uint8_t diagnostic_event;
 static volatile uint32_t control_tick_count;
 static uint8_t uart_rx_byte;
 static char uart_line[ROBOT_RX_BUFFER_SIZE];
@@ -72,15 +94,20 @@ static float gyro_bias_rad_s;
 static float pitch_offset_rad;
 static float pitch_rad;
 static float pitch_integral;
+static int16_t latest_gyro_raw[3];
+static int16_t latest_accel_raw[3];
 static float estimated_position_m;
 static float estimated_velocity_m_s;
 static float reference_position_m;
 static float controller_velocity_m_s;
 static uint32_t telemetry_ticks;
+static uint32_t diagnostic_phase_ticks;
+static uint32_t diagnostic_report_ticks;
 static uint8_t fault_reported;
 static const char *fault_reason = "init";
 
 static void motors_disable(void);
+static void send_diagnostic_event(void);
 
 static uint16_t read_i16_le(const uint8_t *data)
 {
@@ -262,7 +289,8 @@ static void process_command(const char *line)
 {
   if (strcmp(line, "arm") == 0)
   {
-    if (!application_fault && fabsf(pitch_rad) < 0.15f)
+    if (!application_fault && diagnostic_stage == ROBOT_DIAGNOSTIC_IDLE &&
+        fabsf(pitch_rad) < 0.15f)
     {
       estimated_position_m = 0.0f;
       reference_position_m = 0.0f;
@@ -276,9 +304,44 @@ static void process_command(const char *line)
   }
   if (strcmp(line, "disarm") == 0 || strcmp(line, "stop") == 0)
   {
+    if (diagnostic_stage != ROBOT_DIAGNOSTIC_IDLE)
+    {
+      diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+      diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_CANCELLED;
+    }
     motors_disable();
     requested_forward_speed = 0.0f;
     requested_turn_rate = 0.0f;
+    return;
+  }
+  if (strcmp(line, "test") == 0)
+  {
+    if (application_fault)
+    {
+      diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_FAULTED;
+    }
+    else if (robot_armed || diagnostic_stage != ROBOT_DIAGNOSTIC_IDLE)
+    {
+      diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_REJECTED_ARMED;
+    }
+    else if (fabsf(pitch_rad) >= 0.15f)
+    {
+      diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_REJECTED_TILT;
+    }
+    else
+    {
+      motors_disable();
+      diagnostic_phase_ticks = 0U;
+      diagnostic_report_ticks = 0U;
+      requested_forward_speed = 0.0f;
+      requested_turn_rate = 0.0f;
+      diagnostic_stage = ROBOT_DIAGNOSTIC_LEFT_FORWARD;
+      HAL_GPIO_WritePin(motor_enable1_GPIO_Port, motor_enable1_Pin,
+                        GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(motor_enable2_GPIO_Port, motor_enable2_Pin,
+                        GPIO_PIN_RESET);
+      diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_STARTED;
+    }
     return;
   }
   if (strcmp(line, "pid") == 0)
@@ -393,6 +456,11 @@ static HAL_StatusTypeDef update_imu(void)
   {
     return HAL_ERROR;
   }
+  for (uint32_t axis = 0U; axis < 3U; axis++)
+  {
+    latest_gyro_raw[axis] = gyro[axis];
+    latest_accel_raw[axis] = accel[axis];
+  }
   float gyro_y = (float)gyro[1] * 0.015258789f * DEG_TO_RAD - gyro_bias_rad_s;
   float ax = (float)accel[0] * 0.000061f * G_TO_M_S2;
   float az = (float)accel[2] * 0.000061f * G_TO_M_S2;
@@ -400,7 +468,10 @@ static HAL_StatusTypeDef update_imu(void)
   float predicted = pitch_rad + gyro_y * ROBOT_CONTROL_DT;
   pitch_rad =
       ROBOT_PITCH_SIGN * (0.98f * predicted + 0.02f * accel_pitch);
-  update_controller(ROBOT_PITCH_SIGN * gyro_y);
+  if (diagnostic_stage == ROBOT_DIAGNOSTIC_IDLE)
+  {
+    update_controller(ROBOT_PITCH_SIGN * gyro_y);
+  }
   return HAL_OK;
 }
 
@@ -451,6 +522,162 @@ static void send_telemetry(void)
   }
 }
 
+static void send_diagnostic_event(void)
+{
+  if (diagnostic_event == ROBOT_DIAGNOSTIC_EVENT_NONE || uart_tx_busy)
+  {
+    return;
+  }
+
+  const char *message;
+  switch (diagnostic_event)
+  {
+  case ROBOT_DIAGNOSTIC_EVENT_STARTED:
+    message = "TEST,START,step_hz=100,phase_ms=500\r\n";
+    break;
+  case ROBOT_DIAGNOSTIC_EVENT_FAULTED:
+    message = "TEST,FAULTED\r\n";
+    break;
+  case ROBOT_DIAGNOSTIC_EVENT_REJECTED_ARMED:
+    message = "TEST,REJECTED,disarm_first\r\n";
+    break;
+  case ROBOT_DIAGNOSTIC_EVENT_CANCELLED:
+    message = "TEST,CANCELLED\r\n";
+    break;
+  case ROBOT_DIAGNOSTIC_EVENT_REJECTED_TILT:
+    message = "TEST,REJECTED,hold_upright\r\n";
+    break;
+  case ROBOT_DIAGNOSTIC_EVENT_COMPLETE:
+    message = "TEST,DONE\r\n";
+    break;
+  default:
+    diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_NONE;
+    return;
+  }
+
+  size_t length = strlen(message);
+  uart_tx_busy = 1U;
+  if (HAL_UART_Transmit_DMA(&hlpuart1, (uint8_t *)message,
+                            (uint16_t)length) == HAL_OK)
+  {
+    diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_NONE;
+  }
+  else
+  {
+    uart_tx_busy = 0U;
+    application_fault = 1U;
+    fault_reason = "diag_uart";
+    diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+    motors_disable();
+  }
+}
+
+static void send_diagnostic_sample(void)
+{
+  if (uart_tx_busy)
+  {
+    return;
+  }
+
+  int length = snprintf(
+      uart_tx_buffer, sizeof(uart_tx_buffer),
+      "D,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld\r\n",
+      (unsigned)diagnostic_stage,
+      (long)(pitch_rad * 1000.0f),
+      (long)((float)latest_gyro_raw[0] * 15.258789f),
+      (long)((float)latest_gyro_raw[1] * 15.258789f),
+      (long)((float)latest_gyro_raw[2] * 15.258789f),
+      (long)((float)latest_accel_raw[0] * 0.061f),
+      (long)((float)latest_accel_raw[1] * 0.061f),
+      (long)((float)latest_accel_raw[2] * 0.061f));
+  if (length <= 0 || (size_t)length >= sizeof(uart_tx_buffer))
+  {
+    application_fault = 1U;
+    fault_reason = "diag_format";
+    diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+    motors_disable();
+    return;
+  }
+
+  uart_tx_busy = 1U;
+  if (HAL_UART_Transmit_DMA(&hlpuart1, (uint8_t *)uart_tx_buffer,
+                            (uint16_t)length) != HAL_OK)
+  {
+    uart_tx_busy = 0U;
+    application_fault = 1U;
+    fault_reason = "diag_uart";
+    diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+    motors_disable();
+  }
+}
+
+static void run_motor_diagnostic_tick(void)
+{
+  if (diagnostic_stage == ROBOT_DIAGNOSTIC_IDLE || application_fault)
+  {
+    return;
+  }
+
+  RobotWheel_t *active_wheel = NULL;
+  float speed = ROBOT_DIAGNOSTIC_STEP_RATE_HZ * meters_per_step();
+  switch (diagnostic_stage)
+  {
+  case ROBOT_DIAGNOSTIC_LEFT_FORWARD:
+    active_wheel = &left_wheel;
+    break;
+  case ROBOT_DIAGNOSTIC_LEFT_REVERSE:
+    active_wheel = &left_wheel;
+    speed = -speed;
+    break;
+  case ROBOT_DIAGNOSTIC_RIGHT_FORWARD:
+    active_wheel = &right_wheel;
+    break;
+  case ROBOT_DIAGNOSTIC_RIGHT_REVERSE:
+    active_wheel = &right_wheel;
+    speed = -speed;
+    break;
+  default:
+    application_fault = 1U;
+    fault_reason = "diag_stage";
+    diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+    motors_disable();
+    return;
+  }
+
+  float left_speed = active_wheel == &left_wheel ? speed : 0.0f;
+  float right_speed = active_wheel == &right_wheel ? speed : 0.0f;
+  (void)wheel_apply_speed(&left_wheel, left_speed);
+  (void)wheel_apply_speed(&right_wheel, right_speed);
+  if (application_fault)
+  {
+    diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+    motors_disable();
+    return;
+  }
+
+  diagnostic_phase_ticks++;
+  diagnostic_report_ticks++;
+  if (diagnostic_report_ticks >= ROBOT_DIAGNOSTIC_REPORT_TICKS)
+  {
+    diagnostic_report_ticks = 0U;
+    send_diagnostic_sample();
+  }
+  if (diagnostic_phase_ticks >= ROBOT_DIAGNOSTIC_PHASE_TICKS)
+  {
+    diagnostic_phase_ticks = 0U;
+    if (diagnostic_stage == ROBOT_DIAGNOSTIC_RIGHT_REVERSE)
+    {
+      diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+      motors_disable();
+      diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_COMPLETE;
+    }
+    else
+    {
+      diagnostic_stage = (RobotDiagnosticStage_t)(diagnostic_stage + 1);
+    }
+  }
+}
+
 HAL_StatusTypeDef Robot_App_Init(void)
 {
   motors_disable();
@@ -497,6 +724,7 @@ HAL_StatusTypeDef Robot_App_Init(void)
 
 void Robot_App_Run(void)
 {
+  send_diagnostic_event();
   uint32_t ticks;
   __disable_irq();
   ticks = pending_control_ticks;
@@ -533,10 +761,20 @@ void Robot_App_Run(void)
     fault_reason = "fall";
     motors_disable();
   }
+  if (application_fault && diagnostic_stage != ROBOT_DIAGNOSTIC_IDLE)
+  {
+    diagnostic_stage = ROBOT_DIAGNOSTIC_IDLE;
+    diagnostic_event = ROBOT_DIAGNOSTIC_EVENT_FAULTED;
+  }
   if (application_fault)
   {
     motors_disable();
     report_fault();
+  }
+
+  if (!application_fault && diagnostic_stage != ROBOT_DIAGNOSTIC_IDLE)
+  {
+    run_motor_diagnostic_tick();
   }
 
   if (robot_armed && !application_fault)

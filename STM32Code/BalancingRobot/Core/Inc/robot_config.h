@@ -18,4 +18,9 @@
 #define ROBOT_IMU_CALIBRATION_SAMPLES 300U
 #define ROBOT_I2C_TIMEOUT_MS 2U
 
+/* Low-speed open-loop bench check: keep the wheels clear of the ground. */
+#define ROBOT_DIAGNOSTIC_STEP_RATE_HZ 100.0f
+#define ROBOT_DIAGNOSTIC_PHASE_TICKS 250U
+#define ROBOT_DIAGNOSTIC_REPORT_TICKS 25U
+
 #endif

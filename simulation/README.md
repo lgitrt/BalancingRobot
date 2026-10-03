@@ -83,6 +83,24 @@ the four measurements are signed integers scaled by 1e-4. Fault lines begin
 with `FAULT,`. Verify IMU axis/sign while the drivers remain disabled before
 sending `arm`. The software arm is not an emergency stop.
 
+For a bounded hardware check, securely raise the robot so both wheels are
+clear of the floor, keep clear of the wheels, and send `test` while the robot
+is disarmed and held within about 0.15 rad of its calibrated upright angle.
+The test runs each wheel forward and reverse, one wheel at a time, at 100
+microsteps/s for 0.5 seconds per direction; it then disables both drivers.
+Have a physical motor-power cutoff within reach. Send `stop` to cancel early.
+The firmware refuses the test if balancing is armed, a fault is latched, or
+the measured pitch is outside the safe range.
+
+During the test, UART emits `D,stage,pitch_mrad,gx_mdps,gy_mdps,gz_mdps,ax_mg,ay_mg,az_mg`
+at about 20 Hz. Stage 1/2 are left forward/reverse and 3/4 are right
+forward/reverse. Pitch is the fused estimate in milliradians; gyro columns
+are millidegrees/s and accelerometer columns are milligravity. `TEST,START`,
+`TEST,DONE`, `TEST,CANCELLED`, and `TEST,REJECTED,...` lines report test
+status. Compare the gyro and acceleration changes with how you tilt and
+rotate the board; verify motor direction with the wheels raised before
+balancing.
+
 ## Controller comparison, plots, and animation
 
 Run from the repository root:
