@@ -31,6 +31,11 @@ the CubeMX-generated peripheral initialization. Application code is in
 `Core/Src/robot_app.c`; set board-specific signs and sensor address in
 `Core/Inc/robot_config.h`. The default example mechanical parameters are
 placeholders and must be replaced with measured values before balancing.
+The app include, initialization, and main-loop hooks are inside CubeMX's
+`USER CODE` sections, and `ProjectManager.KeepUserCode=true` is set in the IOC.
+After regenerating code in CubeMX, run
+`python STM32Code/BalancingRobot/verify_cube_mx_user_code.py`; it fails if
+CubeMX removed or misplaced any application hook.
 
 | Function | Pin / peripheral |
 |---|---|
