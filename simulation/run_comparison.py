@@ -17,6 +17,7 @@ import numpy as np
 
 from balancing_robot_sim.analytical import Run, controller_for_config, simulate
 from balancing_robot_sim.control import lqr_gain
+from balancing_robot_sim.trajectory import trajectory_from_config
 
 ROBOT: dict = {}
 
@@ -80,6 +81,9 @@ def main() -> None:
             dt,
             initial_pitch,
             float(ROBOT["initial_forward_speed_m_s"]),
+            trajectory_from_config(config["trajectory"])
+            if config.get("trajectory", {}).get("enabled", False)
+            else None,
         )
 
     output = Path(__file__).parent / "results"
@@ -98,6 +102,12 @@ def main() -> None:
             "pitch_rms_deg": float(np.sqrt(np.mean(np.rad2deg(run.pitch_rad) ** 2))),
             "peak_pitch_deg": float(np.max(np.abs(np.rad2deg(run.pitch_rad)))),
             "position_rms_m": float(np.sqrt(np.mean(run.position_m**2))),
+            "trajectory_targets_m": sorted(
+                float(value) for value in np.unique(run.target_position_m)
+            ),
+            "trajectory_target_changes": int(
+                np.count_nonzero(np.diff(run.target_position_m))
+            ),
             "step_position_error_final_m": float(
                 run.position_m[-1] - run.estimated_position_m[-1]
             ),
@@ -109,6 +119,14 @@ def main() -> None:
                 ax.plot(
                     run.time_s, run.position_m, label=f"{name} physical",
                     color=colors[name], lw=2
+                )
+                ax.plot(
+                    run.time_s,
+                    run.target_position_m,
+                    label=f"{name} target",
+                    color=colors[name],
+                    lw=1.2,
+                    ls=":",
                 )
                 ax.plot(
                     run.time_s, run.estimated_position_m, label=f"{name} step estimate",
@@ -163,25 +181,47 @@ def main() -> None:
     plt.close(figure)
 
     figure, axes = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
-    frame_step = max(1, int(round(1.0 / (dt * 20.0))))
-    frames = np.arange(
-        0, max(len(run.time_s) for run in results.values()), frame_step
-    )
+    animation_fps = 20
+    animation_duration_s = max(run.time_s[-1] for run in results.values())
+    frame_count = max(1, int(round(animation_duration_s * animation_fps)))
+    frames = np.linspace(
+        0,
+        max(len(run.time_s) for run in results.values()) - 1,
+        frame_count,
+        endpoint=False,
+    ).round().astype(int)
+    playback_fps = frame_count / animation_duration_s
 
     def update(frame):
         for ax, (name, run) in zip(axes, results.items(), strict=True):
             index = min(int(frame), len(run.time_s) - 1)
             ax.clear()
             add_robot_drawing(ax, run, index)
+            ax.axvline(
+                run.target_position_m[index],
+                color="#e07a27",
+                ls="--",
+                alpha=0.7,
+                label="target position",
+            )
             fallen_label = " - FALLEN" if run.fallen else ""
-            ax.set_title(f"{name}: {run.time_s[index]:.2f} s{fallen_label}")
+            ax.set_title(
+                f"{name}: {run.time_s[index]:.2f} s, "
+                f"target {run.target_position_m[index]:.2f} m{fallen_label}"
+            )
         return []
 
-    animation = FuncAnimation(figure, update, frames=frames, interval=50, blit=False)
+    animation = FuncAnimation(
+        figure,
+        update,
+        frames=frames,
+        interval=1000.0 / playback_fps,
+        blit=False,
+    )
     figure.text(0.995, 0.005, "Author: Luca Obwegs", ha="right", fontsize=8, color="#6b7280")
     animation.save(
         output / "balancing_animation.gif",
-        writer=PillowWriter(fps=20, metadata={"artist": "Luca Obwegs"}),
+        writer=PillowWriter(fps=playback_fps, metadata={"artist": "Luca Obwegs"}),
     )
     plt.close(figure)
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import math
-import time
 from pathlib import Path
 
 import rclpy
@@ -15,6 +14,7 @@ from sensor_msgs.msg import Imu
 
 from balancing_robot_sim.analytical import controller_for_config
 from balancing_robot_sim.control import BalanceController
+from balancing_robot_sim.trajectory import trajectory_from_config
 
 
 def load_config(path: str) -> dict:
@@ -48,16 +48,22 @@ class BalanceNode(Node):
             kind, config, self.control_config
         )
         self.mechanics = self.controller.mechanics
+        trajectory_config = config.get("trajectory", {})
+        self.trajectory = (
+            trajectory_from_config(trajectory_config)
+            if trajectory_config.get("enabled", False)
+            else None
+        )
         self.pitch = float(self.robot_config["initial_pitch_rad"])
         self.pitch_rate = 0.0
-        self.imu_time = 0.0
-        self.command_time = 0.0
+        self.imu_time: float | None = None
+        self.command_time: float | None = None
         self.requested_speed = 0.0
         self.requested_turn = 0.0
         self.estimated_position = 0.0
         self.estimated_velocity = 0.0
         self.step_residual = [0.0, 0.0]
-        self.last_tick = time.monotonic()
+        self.last_tick: float | None = None
         self.fault_latched = False
         self.imu_subscription = self.create_subscription(Imu, "/imu", self.on_imu, 10)
         self.command_subscription = self.create_subscription(
@@ -68,7 +74,14 @@ class BalanceNode(Node):
         )
         rate = float(self.control_config["loop_hz"])
         self.timer = self.create_timer(1.0 / rate, self.control_tick)
-        self.get_logger().info(f"Running {kind.upper()} control at {rate:.0f} Hz")
+        trajectory_status = (
+            "alternating-position trajectory enabled"
+            if self.trajectory is not None
+            else "trajectory disabled"
+        )
+        self.get_logger().info(
+            f"Running {kind.upper()} control at {rate:.0f} Hz; {trajectory_status}"
+        )
 
     def on_imu(self, msg: Imu) -> None:
         axis = self.robot_config["pitch_axis"]
@@ -81,22 +94,26 @@ class BalanceNode(Node):
             quaternion_angle(msg, axis) - float(self.robot_config["initial_pitch_rad"])
         )
         self.pitch_rate = sign * angular_velocity
-        self.imu_time = time.monotonic()
+        self.imu_time = self.get_clock().now().nanoseconds * 1e-9
 
     def on_command(self, msg: Twist) -> None:
         self.requested_speed = float(msg.linear.x)
         self.requested_turn = float(msg.angular.z)
-        self.command_time = time.monotonic()
+        self.command_time = self.get_clock().now().nanoseconds * 1e-9
 
     def publish_stop(self) -> None:
         msg = Twist()
         self.publisher.publish(msg)
 
     def control_tick(self) -> None:
-        now = time.monotonic()
-        dt = min(max(now - self.last_tick, 0.0005), 0.02)
+        now = self.get_clock().now().nanoseconds * 1e-9
+        dt = (
+            1.0 / float(self.control_config["loop_hz"])
+            if self.last_tick is None
+            else min(max(now - self.last_tick, 0.0005), 0.02)
+        )
         self.last_tick = now
-        if self.imu_time == 0.0 or now - self.imu_time > 0.1:
+        if self.imu_time is None or now - self.imu_time > 0.1:
             self.publish_stop()
             self.get_logger().error("IMU data stale; publishing zero speed")
             return
@@ -108,8 +125,20 @@ class BalanceNode(Node):
             return
 
         timeout = float(self.control_config["command_timeout_s"])
-        target_speed = self.requested_speed if now - self.command_time < timeout else 0.0
-        target_turn = self.requested_turn if now - self.command_time < timeout else 0.0
+        manual_command_active = (
+            self.command_time is not None and now - self.command_time < timeout
+        )
+        if manual_command_active:
+            target_speed = self.requested_speed
+            target_turn = self.requested_turn
+        elif self.trajectory is not None:
+            target_speed = self.trajectory.step(
+                self.estimated_position, self.estimated_velocity, dt
+            )
+            target_turn = 0.0
+        else:
+            target_speed = 0.0
+            target_turn = 0.0
         speed, _, turn_offset = self.controller.step(
             self.pitch,
             self.pitch_rate,
@@ -139,7 +168,7 @@ class BalanceNode(Node):
 
         distance = sum(emitted_steps) * self.mechanics.meters_per_step * 0.5
         self.estimated_position += distance
-        self.estimated_velocity = distance / dt
+        self.estimated_velocity = sum(achieved_wheel_speeds) * 0.5
         command = Twist()
         command.linear.x = sum(achieved_wheel_speeds) * 0.5
         separation = float(self.robot_config["wheel_separation_m"])

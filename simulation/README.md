@@ -6,6 +6,8 @@ This ROS 2 Jazzy / Gazebo Harmonic package contains a two-wheel inverted
 pendulum model, a shared PID/LQR controller, keyboard teleoperation, and a
 separate analytical model for repeatable plots and controller comparisons.
 It targets Ubuntu 24.04. Gazebo itself is not available on native Windows.
+Gazebo is configured for a real-time factor of 1, and the ROS controller uses
+simulation time so its control steps track the simulator clock.
 
 ## Install
 
@@ -43,6 +45,15 @@ commanded step-speed odometry estimate; Gazebo odometry is bridged for
 visualization and comparison only. This mirrors the real robot's lack of
 wheel encoders. Consequently, Gazebo's ideal odometry must not be used to
 claim equivalent real-world state feedback.
+
+By default, the controller automatically travels between the two positions
+configured in `trajectory.positions_m` (`-0.3 m` and `+0.3 m`). It uses a
+braking-distance speed profile, configurable speed/acceleration limits, and a
+dwell at each endpoint. A recent keyboard command temporarily takes control;
+the automatic trajectory resumes after command input times out.
+The default launch controller is LQR. With the example gains, PID balances
+but may not track this position route; retune it for the measured mechanics
+before selecting `controller:=pid` for autonomous movement.
 
 The launch file generates the model SDF from `config/mechanical.json` and
 `models/balancing_robot/model.sdf.in`. Edit the physical parameters in that

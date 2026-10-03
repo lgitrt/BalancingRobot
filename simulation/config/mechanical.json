@@ -46,5 +46,14 @@
       "position_kp": 1.0
     },
     "command_timeout_s": 0.5
+  },
+  "trajectory": {
+    "enabled": true,
+    "positions_m": [-0.3, 0.3],
+    "max_speed_m_s": 0.2,
+    "max_acceleration_m_s2": 0.5,
+    "dwell_s": 0.5,
+    "position_tolerance_m": 0.035,
+    "velocity_tolerance_m_s": 0.04
   }
 }

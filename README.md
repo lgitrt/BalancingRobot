@@ -10,10 +10,12 @@ and CubeMX-compatible STM32 firmware.
 
 See [simulation/README.md](simulation/README.md) for Ubuntu 24.04, ROS 2
 Jazzy, and Gazebo Harmonic setup and controls. Mechanical parameters are
-editable in `simulation/config/mechanical.json`. Run
+editable in `simulation/config/mechanical.json`. The default LQR simulation
+uses 1x simulation time and moves smoothly between two configurable positions.
+Run
 `simulation/run_comparison.py` for deterministic analytical PID/LQR plots, a
-GIF animation, and numerical metrics. These generated figures are from the
-analytical model, not from Gazebo.
+1x-speed GIF animation, and numerical metrics. These generated figures are
+from the analytical model, not from Gazebo.
 
 The model is an inverted pendulum driven by wheel acceleration and step-rate
 limited actuators. Both controllers use IMU pitch/rate and step-command-based
@@ -50,10 +52,14 @@ The checked-in plots use illustrative default parameters, a 5-degree initial
 lean, an 8-second analytical simulation, and no simulated missed steps.
 They are examples, not predictions of the assembled robot.
 
-| Controller | Pitch RMS | Peak pitch | Simulated duration | Fall |
-|---|---:|---:|---:|---|
-| PID | 4.46 deg | 6.52 deg | 8.0 s | No |
-| LQR | 1.36 deg | 5.54 deg | 8.0 s | No |
+| Controller | Pitch RMS | Peak pitch | Target changes | Simulated duration | Fall |
+|---|---:|---:|---:|---:|---|
+| PID | 3.05 deg | 5.01 deg | 0 | 8.0 s | No |
+| LQR | 1.48 deg | 5.03 deg | 2 | 8.0 s | No |
+
+With the illustrative PID gains, PID does not reach the first route endpoint
+in this run; the default LQR run visits both configured positions. Tune the
+PID gains for the measured robot before using PID for autonomous path tracking.
 
 Results are in `simulation/results/`. Run
 `python -m unittest discover -s simulation/tests -v` to execute the focused

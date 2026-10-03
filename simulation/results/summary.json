@@ -1,17 +1,26 @@
 {
   "PID": {
-    "pitch_rms_deg": 4.461680573742171,
-    "peak_pitch_deg": 6.51755722612056,
-    "position_rms_m": 0.2564145000028075,
-    "step_position_error_final_m": 0.023573436020392136,
+    "pitch_rms_deg": 3.0537824001570275,
+    "peak_pitch_deg": 5.008239555294196,
+    "position_rms_m": 0.18768582218140428,
+    "trajectory_targets_m": [
+      0.3
+    ],
+    "trajectory_target_changes": 0,
+    "step_position_error_final_m": 0.023328222157111556,
     "fallen": false,
     "simulated_duration_s": 8.0
   },
   "LQR": {
-    "pitch_rms_deg": 1.3577362539353306,
-    "peak_pitch_deg": 5.5437515731118525,
-    "position_rms_m": 0.06424503750359359,
-    "step_position_error_final_m": -0.003534240381811951,
+    "pitch_rms_deg": 1.4750686011696197,
+    "peak_pitch_deg": 5.02580967885188,
+    "position_rms_m": 0.25344039973924615,
+    "trajectory_targets_m": [
+      -0.3,
+      0.3
+    ],
+    "trajectory_target_changes": 2,
+    "step_position_error_final_m": -0.008219244550707994,
     "fallen": false,
     "simulated_duration_s": 8.0
   },

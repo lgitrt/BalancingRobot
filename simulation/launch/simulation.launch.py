@@ -53,7 +53,11 @@ def launch_setup(context, *_args, **_kwargs):
         package="balancing_robot_sim",
         executable="balance_controller",
         parameters=[
-            {"config": str(config), "controller": LaunchConfiguration("controller")}
+            {
+                "config": str(config),
+                "controller": LaunchConfiguration("controller"),
+                "use_sim_time": True,
+            }
         ],
         output="screen",
     )

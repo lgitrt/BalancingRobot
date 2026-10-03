@@ -9,12 +9,14 @@ import numpy as np
 from numpy.typing import NDArray
 
 from balancing_robot_sim.control import BalanceController, ControllerKind
+from balancing_robot_sim.trajectory import AlternatingPositionTrajectory
 
 
 @dataclass
 class Run:
     time_s: NDArray[np.float64]
     position_m: NDArray[np.float64]
+    target_position_m: NDArray[np.float64]
     estimated_position_m: NDArray[np.float64]
     velocity_m_s: NDArray[np.float64]
     pitch_rad: NDArray[np.float64]
@@ -30,6 +32,7 @@ def simulate(
     dt: float,
     initial_pitch_rad: float,
     initial_forward_speed_m_s: float = 0.0,
+    trajectory: AlternatingPositionTrajectory | None = None,
 ) -> Run:
     if duration_s <= 0.0 or dt <= 0.0:
         raise ValueError("duration and dt must be positive")
@@ -38,6 +41,7 @@ def simulate(
     count = int(np.ceil(duration_s / dt)) + 1
     time = np.arange(count, dtype=float) * dt
     position = np.zeros(count, dtype=float)
+    target_position = np.zeros(count, dtype=float)
     velocity = np.zeros(count, dtype=float)
     pitch = np.zeros(count, dtype=float)
     pitch_rate = np.zeros(count, dtype=float)
@@ -55,8 +59,18 @@ def simulate(
     fall_index = count - 1
 
     for i in range(count - 1):
+        target_velocity = (
+            trajectory.step(estimated_position, estimated_velocity, dt)
+            if trajectory is not None
+            else 0.0
+        )
+        target_position[i] = (
+            trajectory.target_position_m
+            if trajectory is not None
+            else controller.reference_position
+        )
         requested_velocity, _, _ = controller.step(
-            pitch[i], pitch_rate[i], dt
+            pitch[i], pitch_rate[i], dt, target_velocity_m_s=target_velocity
         )
         step_m = mechanics.meters_per_step
         step_hz = requested_velocity / step_m
@@ -79,7 +93,7 @@ def simulate(
         step_residual += actuator_velocity * dt / step_m
         emitted_steps = int(np.trunc(step_residual))
         step_residual -= emitted_steps
-        estimated_velocity = emitted_steps * step_m / dt
+        estimated_velocity = actuator_velocity
         estimated_position += emitted_steps * step_m
         position_estimate[i] = estimated_position
 
@@ -103,6 +117,11 @@ def simulate(
 
         position[i + 1] = position[i] + velocity[i] * dt + 0.5 * accel * dt**2
         position_estimate[i + 1] = estimated_position
+        target_position[i + 1] = (
+            trajectory.target_position_m
+            if trajectory is not None
+            else controller.reference_position
+        )
         velocity[i + 1] = velocity[i] + accel * dt
         pitch_rate[i + 1] = pitch_rate[i] + theta_ddot * dt
         pitch[i + 1] = pitch[i] + pitch_rate[i] * dt + 0.5 * theta_ddot * dt**2
@@ -118,6 +137,7 @@ def simulate(
     if fall_index < count - 1:
         time = time[: fall_index + 1]
         position = position[: fall_index + 1]
+        target_position = target_position[: fall_index + 1]
         position_estimate = position_estimate[: fall_index + 1]
         velocity = velocity[: fall_index + 1]
         pitch = pitch[: fall_index + 1]
@@ -131,6 +151,7 @@ def simulate(
     return Run(
         time,
         position,
+        target_position,
         position_estimate,
         velocity,
         pitch,
