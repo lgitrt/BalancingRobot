@@ -52,7 +52,7 @@ static RobotWheel_t left_wheel = {
     .motor_sign = ROBOT_LEFT_MOTOR_SIGN};
 static RobotWheel_t right_wheel = {
     .timer = &htim1, .channel = TIM_CHANNEL_1,
-    .direction_port = GPIOC, .direction_pin = dir_right_Pin,
+    .direction_port = dir_right_GPIO_Port, .direction_pin = dir_right_Pin,
     .motor_sign = ROBOT_RIGHT_MOTOR_SIGN};
 
 static volatile uint32_t pending_control_ticks;
@@ -254,7 +254,8 @@ static void motors_disable(void)
     (void)HAL_TIM_PWM_Stop(left_wheel.timer, left_wheel.channel);
     left_wheel.output_running = 0U;
   }
-  HAL_GPIO_WritePin(motor_enable_GPIO_Port, motor_enable_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(motor_enable1_GPIO_Port, motor_enable1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(motor_enable2_GPIO_Port, motor_enable2_Pin, GPIO_PIN_SET);
 }
 
 static void process_command(const char *line)
@@ -268,7 +269,8 @@ static void process_command(const char *line)
       pitch_integral = 0.0f;
       robot_armed = 1U;
       controller_velocity_m_s = 0.0f;
-      HAL_GPIO_WritePin(motor_enable_GPIO_Port, motor_enable_Pin, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(motor_enable1_GPIO_Port, motor_enable1_Pin, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(motor_enable2_GPIO_Port, motor_enable2_Pin, GPIO_PIN_RESET);
     }
     return;
   }

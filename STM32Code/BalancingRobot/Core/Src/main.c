@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "robot_app.h"
 
 /* USER CODE END Includes */
 
@@ -111,6 +112,10 @@ int main(void)
   MX_TIM6_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
+  if (Robot_App_Init() != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   /* USER CODE END 2 */
 
@@ -121,6 +126,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    Robot_App_Run();
   }
   /* USER CODE END 3 */
 }
@@ -512,8 +518,11 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|dir_left_Pin, GPIO_PIN_RESET);
 
+  /* Keep both active-low A4988 ENABLE inputs inactive during startup. */
+  HAL_GPIO_WritePin(motor_enable2_GPIO_Port, motor_enable2_Pin, GPIO_PIN_SET);
+
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(motor_enable_GPIO_Port, motor_enable_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(motor_enable1_GPIO_Port, motor_enable1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(dir_right_GPIO_Port, dir_right_Pin, GPIO_PIN_RESET);
@@ -524,26 +533,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin dir_left_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin|dir_left_Pin;
+  /*Configure GPIO pins : motor_enable2_Pin LD2_Pin dir_left_Pin */
+  GPIO_InitStruct.Pin = motor_enable2_Pin|LD2_Pin|dir_left_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : motor_enable_Pin */
-  GPIO_InitStruct.Pin = motor_enable_Pin;
+  /*Configure GPIO pins : motor_enable1_Pin dir_right_Pin */
+  GPIO_InitStruct.Pin = motor_enable1_Pin|dir_right_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(motor_enable_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : dir_right_Pin */
-  GPIO_InitStruct.Pin = dir_right_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(dir_right_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 4, 0);
@@ -586,4 +588,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-

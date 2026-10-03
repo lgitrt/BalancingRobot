@@ -32,6 +32,17 @@ the CubeMX-generated peripheral initialization. Application code is in
 `Core/Inc/robot_config.h`. The default example mechanical parameters are
 placeholders and must be replaced with measured values before balancing.
 
+| Function | Pin / peripheral |
+|---|---|
+| Right motor STEP | PA8 / TIM1_CH1 |
+| Left motor STEP | PB4 / TIM3_CH1 |
+| Left motor DIR | PA9 |
+| Right motor DIR | PB10 |
+| A4988 ENABLE 1 / 2 | PB0 / PA4; active low, disabled at startup |
+| IMU I2C | PB8 / PB9 / I2C1 |
+| Serial commands and telemetry | PA2 / PA3 / LPUART1 |
+| 500 Hz control tick | TIM6 |
+
 Serial control and telemetry are described in the simulation guide. Firmware
 starts with both A4988 drivers disabled; use a serial `arm` command only
 after checking the IMU sign and supporting the robot. Provide an independent
