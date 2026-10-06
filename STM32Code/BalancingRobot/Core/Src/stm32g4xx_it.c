@@ -57,6 +57,8 @@
 /* External variables --------------------------------------------------------*/
 extern DMA_HandleTypeDef hdma_i2c1_rx;
 extern I2C_HandleTypeDef hi2c1;
+extern I2C_HandleTypeDef hi2c3;
+extern I2C_HandleTypeDef hi2c4;
 extern DMA_HandleTypeDef hdma_lpuart1_rx;
 extern DMA_HandleTypeDef hdma_lpuart1_tx;
 extern UART_HandleTypeDef hlpuart1;
@@ -302,6 +304,34 @@ void TIM6_DAC_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles I2C4 event interrupt / I2C4 wake-up interrupt through EXTI line 42.
+  */
+void I2C4_EV_IRQHandler(void)
+{
+  /* USER CODE BEGIN I2C4_EV_IRQn 0 */
+
+  /* USER CODE END I2C4_EV_IRQn 0 */
+  HAL_I2C_EV_IRQHandler(&hi2c4);
+  /* USER CODE BEGIN I2C4_EV_IRQn 1 */
+
+  /* USER CODE END I2C4_EV_IRQn 1 */
+}
+
+/**
+  * @brief This function handles I2C4 error interrupt.
+  */
+void I2C4_ER_IRQHandler(void)
+{
+  /* USER CODE BEGIN I2C4_ER_IRQn 0 */
+
+  /* USER CODE END I2C4_ER_IRQn 0 */
+  HAL_I2C_ER_IRQHandler(&hi2c4);
+  /* USER CODE BEGIN I2C4_ER_IRQn 1 */
+
+  /* USER CODE END I2C4_ER_IRQn 1 */
+}
+
+/**
   * @brief This function handles LPUART1 global interrupt.
   */
 void LPUART1_IRQHandler(void)
@@ -313,6 +343,34 @@ void LPUART1_IRQHandler(void)
   /* USER CODE BEGIN LPUART1_IRQn 1 */
 
   /* USER CODE END LPUART1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles I2C3 event interrupt / I2C3 wake-up interrupt through EXTI line 27.
+  */
+void I2C3_EV_IRQHandler(void)
+{
+  /* USER CODE BEGIN I2C3_EV_IRQn 0 */
+
+  /* USER CODE END I2C3_EV_IRQn 0 */
+  HAL_I2C_EV_IRQHandler(&hi2c3);
+  /* USER CODE BEGIN I2C3_EV_IRQn 1 */
+
+  /* USER CODE END I2C3_EV_IRQn 1 */
+}
+
+/**
+  * @brief This function handles I2C3 error interrupt.
+  */
+void I2C3_ER_IRQHandler(void)
+{
+  /* USER CODE BEGIN I2C3_ER_IRQn 0 */
+
+  /* USER CODE END I2C3_ER_IRQn 0 */
+  HAL_I2C_ER_IRQHandler(&hi2c3);
+  /* USER CODE BEGIN I2C3_ER_IRQn 1 */
+
+  /* USER CODE END I2C3_ER_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

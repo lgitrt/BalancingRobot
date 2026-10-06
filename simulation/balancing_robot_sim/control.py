@@ -52,38 +52,44 @@ class MechanicalParameters:
 
 @dataclass(frozen=True)
 class ControllerParameters:
-    lqr_q: tuple[float, float, float, float]
+    lqr_q: tuple[float, float, float, float, float]
     lqr_r: float
     pitch_kp: float
     pitch_ki: float
     pitch_kd: float
     velocity_kp: float
-    position_kp: float
+    position_hold_enabled: bool
+    position_hold_kp: float
+    position_hold_max_speed: float
+    position_hold_max_error_m: float = 0.15
+    position_hold_max_trim_rad: float = float(np.deg2rad(5.0))
 
 
 def lqr_gain(
     mechanics: MechanicalParameters,
     parameters: ControllerParameters,
 ) -> np.ndarray:
-    """Return continuous LQR gains for [position, speed, pitch, pitch rate]."""
+    """Return continuous LQR gains for
+    [position-error integral, position error, speed, pitch, pitch rate]."""
     m = mechanics.chassis_mass_kg
     length = mechanics.chassis_com_height_m
     inertia = mechanics.equivalent_pitch_inertia
     g = 9.80665
-    a = np.array(
-        [
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-            [0.0, 0.0, m * g * length / inertia, 0.0],
-        ],
-        dtype=float,
-    )
-    b = np.array([[0.0], [1.0], [0.0], [-m * length / inertia]], dtype=float)
+    a = np.zeros((5, 5), dtype=float)
+    a[0, 1] = 1.0
+    a[1, 2] = 1.0
+    a[3, 4] = 1.0
+    a[4, 3] = m * g * length / inertia
+    b = np.array([[0.0], [0.0], [1.0], [0.0], [-m * length / inertia]], dtype=float)
+    if len(parameters.lqr_q) != 5:
+        raise ValueError(
+            "lqr_q must contain five weights: position integral, position, "
+            "speed, pitch, pitch rate"
+        )
     q = np.diag(parameters.lqr_q)
     r = np.array([[parameters.lqr_r]], dtype=float)
     riccati = solve_continuous_are(a, b, q, r)
-    return np.linalg.solve(r, b.T @ riccati).reshape(4)
+    return np.linalg.solve(r, b.T @ riccati).reshape(5)
 
 
 class BalanceController:
@@ -100,14 +106,26 @@ class BalanceController:
         self.kind = kind
         self.mechanics = mechanics
         self.parameters = parameters
+        if (not np.isfinite(parameters.position_hold_kp) or
+                parameters.position_hold_kp < 0.0 or
+                not np.isfinite(parameters.position_hold_max_speed) or
+                parameters.position_hold_max_speed <= 0.0 or
+                not np.isfinite(parameters.position_hold_max_error_m) or
+                parameters.position_hold_max_error_m <= 0.0 or
+                not np.isfinite(parameters.position_hold_max_trim_rad) or
+                parameters.position_hold_max_trim_rad < 0.0):
+            raise ValueError("Position-hold gains and limits must be finite; limits positive")
         self.gain = lqr_gain(mechanics, parameters) if kind == "lqr" else None
         self.integral_pitch = 0.0
+        self.position_trim = 0.0
         self.commanded_position = 0.0
         self.commanded_velocity = 0.0
         self.reference_position = 0.0
+        self.position_hold_enabled = parameters.position_hold_enabled
 
     def reset(self, position: float = 0.0, velocity: float = 0.0) -> None:
         self.integral_pitch = 0.0
+        self.position_trim = 0.0
         self.commanded_position = position
         self.commanded_velocity = velocity
         self.reference_position = position
@@ -135,26 +153,52 @@ class BalanceController:
         else:
             raise ValueError("position and velocity estimates must be supplied together")
         self.reference_position += target_velocity_m_s * dt
-        position_error = self.commanded_position - self.reference_position
-        velocity_error = self.commanded_velocity - target_velocity_m_s
+        position_offset = self.commanded_position - self.reference_position
+        lqr_position = self.kind == "lqr" and self.position_hold_enabled
+        # LQR holds position with direct position and learned-trim (integral)
+        # feedback; PID keeps the bounded position-to-velocity correction.
+        correction = float(np.clip(
+            -p.position_hold_kp * position_offset,
+            -p.position_hold_max_speed,
+            p.position_hold_max_speed,
+        )) if self.position_hold_enabled and not lqr_position else 0.0
+        velocity_error = self.commanded_velocity - (target_velocity_m_s + correction)
 
         if self.kind == "lqr":
             assert self.gain is not None
+            position_error = float(np.clip(
+                position_offset,
+                -p.position_hold_max_error_m,
+                p.position_hold_max_error_m,
+            )) if lqr_position else 0.0
             control_state = np.array(
-                [position_error, velocity_error, pitch_rad, pitch_rate_rad_s],
+                [
+                    position_error,
+                    velocity_error,
+                    pitch_rad - self.position_trim,
+                    pitch_rate_rad_s,
+                ],
                 dtype=float,
             )
-            acceleration = -float(self.gain @ control_state)
+            acceleration = -float(self.gain[1:] @ control_state)
+            if lqr_position and abs(acceleration) < m.max_wheel_accel_m_s2:
+                self.position_trim = float(np.clip(
+                    self.position_trim -
+                    self.gain[0] / self.gain[3] * position_error * dt,
+                    -p.position_hold_max_trim_rad,
+                    p.position_hold_max_trim_rad,
+                ))
         else:
             tentative_integral = float(
                 np.clip(self.integral_pitch + pitch_rad * dt, -0.5, 0.5)
             )
+            # Positive velocity feedback: to slow down the robot first has to
+            # accelerate under its centre of mass so that it leans back.
             acceleration = (
                 p.pitch_kp * pitch_rad
                 + p.pitch_ki * tentative_integral
                 + p.pitch_kd * pitch_rate_rad_s
-                - p.velocity_kp * velocity_error
-                - p.position_kp * position_error
+                + p.velocity_kp * velocity_error
             )
             if abs(acceleration) < m.max_wheel_accel_m_s2:
                 self.integral_pitch = tentative_integral

@@ -1,5 +1,5 @@
 # Author: Luca Obwegs
-.venv/
+.venv*/
 __pycache__/
 *.py[cod]
 simulation/build/
@@ -7,3 +7,6 @@ simulation/install/
 simulation/log/
 STM32Code/**/Debug/
 STM32Code/**/Release/
+STM32Code/**/.metadata/
+STM32Code/**/.settings/
+STM32Code/**/*.launch

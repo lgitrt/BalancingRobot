@@ -1,36 +1,38 @@
 {
   "PID": {
-    "pitch_rms_deg": 3.0537824001570275,
-    "peak_pitch_deg": 5.008239555294196,
-    "position_rms_m": 0.18768582218140428,
-    "trajectory_targets_m": [
-      0.3
-    ],
-    "trajectory_target_changes": 0,
-    "step_position_error_final_m": 0.023328222157111556,
-    "fallen": false,
-    "simulated_duration_s": 8.0
-  },
-  "LQR": {
-    "pitch_rms_deg": 1.4750686011696197,
-    "peak_pitch_deg": 5.02580967885188,
-    "position_rms_m": 0.25344039973924615,
+    "pitch_rms_deg": 1.2356362244441939,
+    "peak_pitch_deg": 5.013267863099777,
+    "position_rms_m": 0.2799396984754633,
     "trajectory_targets_m": [
       -0.3,
       0.3
     ],
     "trajectory_target_changes": 2,
-    "step_position_error_final_m": -0.008219244550707994,
+    "step_position_error_final_m": -0.00821863016047715,
+    "fallen": false,
+    "simulated_duration_s": 8.0
+  },
+  "LQR": {
+    "pitch_rms_deg": 1.8563482266158344,
+    "peak_pitch_deg": 5.032714170510675,
+    "position_rms_m": 0.23095458607649189,
+    "trajectory_targets_m": [
+      -0.3,
+      0.3
+    ],
+    "trajectory_target_changes": 2,
+    "step_position_error_final_m": -0.007455762368197061,
     "fallen": false,
     "simulated_duration_s": 8.0
   },
   "author": "Luca Obwegs",
   "design": {
     "lqr_gain": [
-      -3.535533905932697,
-      -4.878658346639474,
-      -39.3487885328077,
-      -6.294988594404548
+      -3.651483716701103,
+      -11.580696004164906,
+      -9.235403812117832,
+      -45.20739984140207,
+      -6.692185911808508
     ]
   }
 }

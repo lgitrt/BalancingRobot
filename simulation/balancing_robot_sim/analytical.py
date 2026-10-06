@@ -67,7 +67,7 @@ def simulate(
         target_position[i] = (
             trajectory.target_position_m
             if trajectory is not None
-            else controller.reference_position
+            else controller.reference_position if controller.position_hold_enabled else np.nan
         )
         requested_velocity, _, _ = controller.step(
             pitch[i], pitch_rate[i], dt, target_velocity_m_s=target_velocity
@@ -120,7 +120,7 @@ def simulate(
         target_position[i + 1] = (
             trajectory.target_position_m
             if trajectory is not None
-            else controller.reference_position
+            else controller.reference_position if controller.position_hold_enabled else np.nan
         )
         velocity[i + 1] = velocity[i] + accel * dt
         pitch_rate[i + 1] = pitch_rate[i] + theta_ddot * dt
@@ -200,6 +200,11 @@ def controller_for_config(
         pitch_ki=float(pid["pitch_ki"]),
         pitch_kd=float(pid["pitch_kd"]),
         velocity_kp=float(pid["velocity_kp"]),
-        position_kp=float(pid["position_kp"]),
+        position_hold_enabled=bool(control_config["position_hold"]["enabled"]),
+        position_hold_kp=float(control_config["position_hold"]["kp_s_inv"]),
+        position_hold_max_speed=float(control_config["position_hold"]["max_correction_speed_m_s"]),
+        position_hold_max_error_m=float(control_config["position_hold"]["max_position_error_m"]),
+        position_hold_max_trim_rad=float(np.deg2rad(
+            control_config["position_hold"]["max_learned_trim_deg"])),
     )
     return BalanceController(kind, mechanics, parameters)

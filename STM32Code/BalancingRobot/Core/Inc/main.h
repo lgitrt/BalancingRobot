@@ -62,6 +62,8 @@ void Error_Handler(void);
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
 #define B1_EXTI_IRQn EXTI15_10_IRQn
+#define step_left_Pin GPIO_PIN_0
+#define step_left_GPIO_Port GPIOA
 #define LPUART1_TX_Pin GPIO_PIN_2
 #define LPUART1_TX_GPIO_Port GPIOA
 #define LPUART1_RX_Pin GPIO_PIN_3
@@ -72,20 +74,26 @@ void Error_Handler(void);
 #define LD2_GPIO_Port GPIOA
 #define motor_enable1_Pin GPIO_PIN_0
 #define motor_enable1_GPIO_Port GPIOB
-#define dir_right_Pin GPIO_PIN_10
-#define dir_right_GPIO_Port GPIOB
+#define scl_right_enc_Pin GPIO_PIN_6
+#define scl_right_enc_GPIO_Port GPIOC
+#define sda_right_enc_Pin GPIO_PIN_7
+#define sda_right_enc_GPIO_Port GPIOC
+#define scl_left_enc_Pin GPIO_PIN_8
+#define scl_left_enc_GPIO_Port GPIOC
+#define sda_left_enc_Pin GPIO_PIN_9
+#define sda_left_enc_GPIO_Port GPIOC
 #define step_right_Pin GPIO_PIN_8
 #define step_right_GPIO_Port GPIOA
 #define dir_left_Pin GPIO_PIN_9
 #define dir_left_GPIO_Port GPIOA
+#define dir_right_Pin GPIO_PIN_10
+#define dir_right_GPIO_Port GPIOA
 #define T_SWDIO_Pin GPIO_PIN_13
 #define T_SWDIO_GPIO_Port GPIOA
 #define T_SWCLK_Pin GPIO_PIN_14
 #define T_SWCLK_GPIO_Port GPIOA
 #define T_SWO_Pin GPIO_PIN_3
 #define T_SWO_GPIO_Port GPIOB
-#define step_left_Pin GPIO_PIN_4
-#define step_left_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

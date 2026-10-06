@@ -23,8 +23,16 @@ def export(config_path: Path, output_path: Path) -> Path:
     robot = config["robot"]
     controller = controller_for_config("lqr", config, config["control"])
     gain = lqr_gain(controller.mechanics, controller.parameters)
+    mech = controller.mechanics
+    inertia = mech.equivalent_pitch_inertia
+    mass_height = mech.chassis_mass_kg * mech.chassis_com_height_m
     macros = {
         "ROBOT_CONTROL_HZ": c_float(config["control"]["loop_hz"]),
+        "ROBOT_POSITION_HOLD_ENABLED": "1U" if config["control"]["position_hold"]["enabled"] else "0U",
+        "ROBOT_POSITION_HOLD_KP": c_float(config["control"]["position_hold"]["kp_s_inv"]),
+        "ROBOT_POSITION_HOLD_MAX_SPEED_M_S": c_float(config["control"]["position_hold"]["max_correction_speed_m_s"]),
+        "ROBOT_POSITION_HOLD_MAX_ERROR_M": c_float(config["control"]["position_hold"]["max_position_error_m"]),
+        "ROBOT_POSITION_HOLD_MAX_TRIM_DEG": c_float(config["control"]["position_hold"]["max_learned_trim_deg"]),
         "ROBOT_WHEEL_RADIUS_M": c_float(robot["wheel_radius_m"]),
         "ROBOT_WHEEL_SEPARATION_M": c_float(robot["wheel_separation_m"]),
         "ROBOT_STEP_ANGLE_DEG": c_float(robot["wheel_step_angle_deg"]),
@@ -38,11 +46,17 @@ def export(config_path: Path, output_path: Path) -> Path:
         "ROBOT_PID_PITCH_KI": c_float(config["control"]["pid"]["pitch_ki"]),
         "ROBOT_PID_PITCH_KD": c_float(config["control"]["pid"]["pitch_kd"]),
         "ROBOT_PID_VELOCITY_KP": c_float(config["control"]["pid"]["velocity_kp"]),
-        "ROBOT_PID_POSITION_KP": c_float(config["control"]["pid"]["position_kp"]),
-        "ROBOT_LQR_K_POSITION": c_float(gain[0]),
-        "ROBOT_LQR_K_VELOCITY": c_float(gain[1]),
-        "ROBOT_LQR_K_PITCH": c_float(gain[2]),
-        "ROBOT_LQR_K_PITCH_RATE": c_float(gain[3]),
+        "ROBOT_PID_POSITION_KP": c_float(0.0),
+        "ROBOT_LQR_K_INTEGRAL": c_float(gain[0]),
+        "ROBOT_LQR_K_POSITION": c_float(gain[1]),
+        "ROBOT_LQR_K_VELOCITY": c_float(gain[2]),
+        "ROBOT_LQR_K_PITCH": c_float(gain[3]),
+        "ROBOT_LQR_K_PITCH_RATE": c_float(gain[4]),
+        # Linearised pitch plant theta_ddot = alpha*theta - beta*a - damping*omega
+        "ROBOT_PLANT_ALPHA": c_float(mass_height * 9.80665 / inertia),
+        "ROBOT_PLANT_BETA": c_float(mass_height / inertia),
+        "ROBOT_PLANT_DAMPING": c_float(mech.pitch_damping_n_m_s / inertia),
+        "ROBOT_MOTOR_TIME_CONSTANT_S": c_float(robot["motor_time_constant_s"]),
     }
     content = [
         "/* Author: Luca Obwegs */",
