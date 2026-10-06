@@ -1,6 +1,6 @@
-# Author: Luca Obwegs
-
 # Balancing robot simulation
+
+Developed by Luca Obwegs.
 
 This package contains:
 - an analytical model of the two-wheel inverted pendulum, used for the
