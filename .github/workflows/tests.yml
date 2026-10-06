@@ -1,0 +1,36 @@
+name: Host regression tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install host test dependencies
+        run: python -m pip install -r simulation/requirements.txt -r teleop/requirements.txt
+      - name: Test simulation and parameter export
+        working-directory: simulation
+        run: python -m unittest discover -s tests -v
+      - name: Test teleoperation logic
+        run: python -m unittest discover -s teleop -p "test_*.py" -v
+      - name: Verify CubeMX application hooks
+        run: python STM32Code/BalancingRobot/verify_cube_mx_user_code.py
+      - name: Build and run firmware host regression
+        working-directory: STM32Code
+        run: |
+          gcc -O2 -Wall -Wextra -Werror -Wno-unused-parameter \
+            -DUSE_HAL_DRIVER -DSTM32G474xx -IBalancingRobot/Core/Inc \
+            -isystem BalancingRobot/Drivers/STM32G4xx_HAL_Driver/Inc \
+            -isystem BalancingRobot/Drivers/CMSIS/Device/ST/STM32G4xx/Include \
+            -isystem BalancingRobot/Drivers/CMSIS/Include \
+            tests/test_robot.c -o /tmp/test_robot -lm
+          /tmp/test_robot

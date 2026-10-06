@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1540" height="850" viewBox="0 0 1540 850" role="img" aria-labelledby="title description">
+  <title id="title">Balancing robot: controller, plant and estimator feedback</title>
+  <desc id="description">Read clockwise. LQR sends acceleration to the speed integrator and differential drive, which sends step and direction pulses to the robot. Body and wheel motion feed IMU and encoder sensors below the plant. Two separate measurement lanes return to the pitch and wheel Kalman filters on the left. Their controller-facing state returns upward to LQR. Separate amber lanes across the top carry previous acceleration and applied speed changes into estimator prediction.</desc>
+  <defs>
+    <marker id="cyan" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#38bdf8"/></marker>
+    <marker id="amber" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#fbbf24"/></marker>
+    <style>
+      text { font: 18px Arial, sans-serif; fill: #dbeafe; }
+      .title { font-size: 25px; font-weight: bold; fill: #f8fafc; }
+      .heading { font-size: 21px; font-weight: bold; fill: #f8fafc; }
+      .small { font-size: 16px; fill: #a9bdd4; }
+      .signal { font-size: 17px; fill: #7dd3fc; }
+      .command { font-size: 16px; fill: #fbbf24; }
+      .box { fill: #111e32; stroke: #38516d; stroke-width: 1.5; rx: 14; }
+      .kf { stroke: #38bdf8; }
+      .controller { stroke: #a78bfa; }
+      .flow { fill: none; stroke: #38bdf8; stroke-width: 2.5; marker-end: url(#cyan); }
+      .feedback { fill: none; stroke: #fbbf24; stroke-width: 2.5; stroke-dasharray: 8 5; marker-end: url(#amber); }
+    </style>
+  </defs>
+  <rect width="1540" height="850" rx="18" fill="#09111f"/>
+  <text x="35" y="38" class="title">LQR + pitch KF + wheel-encoder KFs</text>
+  <text x="35" y="64" class="small">500 Hz closed loop / 2 ms tick. Follow the cyan path clockwise.</text>
+
+  <path d="M930 190V95H20V635H60" class="feedback"/>
+  <text x="350" y="86" class="command">Applied wheel-speed changes &#x394;&#x3A9;_L / &#x394;&#x3A9;_R &#x2192; wheel prediction</text>
+  <path d="M630 190V140H40V510H60" class="feedback"/>
+  <text x="275" y="132" class="command">a_cmd from previous tick &#x2192; 35 ms lag proxy a_f</text>
+
+  <rect x="580" y="190" width="240" height="150" class="box controller"/>
+  <text x="598" y="220" class="heading">1. LQR controller</text>
+  <text x="598" y="249">State errors &#x2192; a_cmd</text>
+  <text x="598" y="278" class="small">v_ref, integrated x_ref</text>
+  <text x="598" y="305" class="small">Bounded trim + anti-windup</text>
+  <text x="598" y="327" class="small">Position hold enabled</text>
+  <rect x="920" y="190" width="250" height="150" class="box"/>
+  <text x="938" y="220" class="heading">2. Integrator + drive</text>
+  <text x="938" y="249">a_cmd &#x2192; v_cmd</text>
+  <text x="938" y="278">v_L / v_R = v_cmd &#x2213; &#x3C9;b/2</text>
+  <text x="938" y="305" class="small">Turn request &#x3C9;, speed limits</text>
+  <text x="938" y="327" class="small">A4988 STEP / DIR</text>
+  <rect x="1260" y="190" width="245" height="150" class="box"/>
+  <text x="1278" y="220" class="heading">3. Physical plant</text>
+  <text x="1278" y="252">Motors + wheel motion</text>
+  <text x="1278" y="282">Body pitch / translation</text>
+  <text x="1278" y="313" class="small">Real robot, not ideal model</text>
+  <path d="M820 260H920" class="flow"/>
+  <text x="834" y="244" class="signal">a_cmd</text>
+  <text x="834" y="287" class="small">m/s&#xB2;</text>
+  <path d="M1170 260H1260" class="flow"/>
+  <text x="1182" y="244" class="signal">STEP</text>
+  <text x="1182" y="287" class="signal">DIR</text>
+
+  <rect x="1160" y="440" width="345" height="290" class="box"/>
+  <text x="1180" y="470" class="heading">4. Sensors</text>
+  <text x="1180" y="505">LSM6DS0 IMU</text>
+  <text x="1180" y="533" class="small">Gyro rate + acceleration vector</text>
+  <text x="1180" y="559" class="small">Accelerometer-derived pitch / norm</text>
+  <path d="M1180 585H1485" stroke="#38516d"/>
+  <text x="1180" y="620">2 &#xD7; AS5600 encoders</text>
+  <text x="1180" y="650" class="small">Corrected / unwrapped wheel angles</text>
+  <text x="1180" y="678" class="small">100 Hz correction, 2.3 ms latency</text>
+  <text x="1180" y="706" class="small">Wheel odometry does not detect floor slip</text>
+  <path d="M1380 340V440" class="flow"/>
+  <text x="1070" y="383" class="signal">Body rotation / specific force</text>
+  <text x="1070" y="410" class="signal">Wheel-shaft angles &#x3C6;_L, &#x3C6;_R</text>
+
+  <rect x="60" y="400" width="440" height="350" class="box kf"/>
+  <text x="82" y="431" class="heading">5. State estimators</text>
+  <text x="82" y="468">Four-state balance-offset pitch KF</text>
+  <text x="82" y="499" class="small">[pitch, rate, gyro bias, balance point]</text>
+  <text x="82" y="530">Control pitch: &#x3B8;&#x302; &#x2212; d&#x302;</text>
+  <text x="82" y="560">Control rate: LPF(y_g &#x2212; b&#x302;_g)</text>
+  <path d="M82 582H478" stroke="#38516d"/>
+  <text x="82" y="617">Two wheel KFs: [angle &#x3C6;, speed &#x3A9;]</text>
+  <text x="82" y="647">x&#x302; = r(&#x3C6;&#x302;_L + &#x3C6;&#x302;_R)/2 &#x2212; x_0</text>
+  <text x="82" y="677">v&#x302; = r(&#x3A9;&#x302;_L + &#x3A9;&#x302;_R)/2</text>
+  <text x="82" y="710" class="small">500 Hz prediction; gated sensor updates</text>
+  <text x="82" y="735" class="small">Lost-step resync / reported encoder fallback</text>
+
+  <path d="M1160 510H500" class="flow"/>
+  <text x="650" y="487" class="signal">y_g: gyro rate [rad/s]</text>
+  <text x="650" y="539" class="signal">y_a: accel pitch [rad] + acceleration-norm check</text>
+  <path d="M1160 635H500" class="flow"/>
+  <text x="650" y="609" class="signal">y_enc,L / y_enc,R: delayed wheel angles [rad]</text>
+  <text x="650" y="665" class="small">Sensor-delay model: y_enc = &#x3C6; &#x2212; &#x3C4;_enc &#x3A9;</text>
+
+  <path d="M440 400V260H580" class="flow"/>
+  <text x="65" y="291" class="signal">Estimated travel x&#x302; [m]</text>
+  <text x="65" y="318" class="signal">Estimated speed v&#x302; [m/s]</text>
+  <text x="65" y="345" class="signal">Balance-relative pitch [rad]</text>
+  <text x="65" y="372" class="signal">Bias-corrected gyro rate [rad/s]</text>
+  <text x="60" y="801" class="small">Cyan: physical, measured and estimated signals. Dashed amber: known commands used by estimator models.</text>
+  <text x="60" y="828" class="small">The pitch KF rate state supports prediction; the LQR rate feedback is filtered, bias-corrected gyro data.</text>
+</svg>

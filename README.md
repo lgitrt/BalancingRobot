@@ -1,6 +1,19 @@
 # Author: Luca Obwegs
 # BalancingRobot
 
+![Control and estimator signal flow](docs/control-flow.svg)
+
+**Preferred hardware configuration:** LQR + four-state pitch/balance-offset KF
++ wheel-encoder KFs. The hardware comparison keeps LQR fixed and varies
+estimation and wheel feedback; PID versus LQR is a separate simulation study.
+
+[![Watch the actual robot](https://lucaobwegs.com/balancing-robot/hardware-run-1.jpg)](https://lucaobwegs.com/balancing-robot/hardware-run-1.mp4)
+
+[Hardware video 1 (MP4)](https://lucaobwegs.com/balancing-robot/hardware-run-1.mp4)
+and [video 2 (MP4)](https://lucaobwegs.com/balancing-robot/hardware-run-2.mp4)
+show the built robot running. They are demonstrations, not controlled
+disturbance-response measurements.
+
 A two-wheel self-balancing robot built from:
 - a NUCLEO-G474RE (STM32G474RE);
 - an X-NUCLEO-IKS01A1 inertial board (LSM6DS0 accelerometer and gyro);
@@ -17,7 +30,7 @@ The repository contains:
 | [teleop/](teleop/README.md) | desktop app to drive the robot with the keyboard over UART |
 | [docs/hardware_results/](docs/hardware_results) | plots of the estimator comparison measured on the robot |
 
-![PID vs LQR animation](simulation/results/balancing_animation.gif)
+![PID vs LQR simulation animation, not hardware](simulation/results/balancing_animation.gif)
 
 ## Quick start
 
@@ -136,7 +149,9 @@ All application files are in `Core/Inc` and `Core/Src`:
 
 ### Control loop
 
-Every 2 ms (TIM6) the firmware:
+TIM6 posts a tick every 2 ms; `Robot_App_Run()` executes the control task in
+the main loop, not inside the timer ISR. More than one pending tick latches
+the `timing` fault and disables the motors. On each tick the task:
 1. reads the IMU;
 2. updates the pitch estimator;
 3. updates the wheel feedback; the encoder samples are read in the
@@ -147,6 +162,22 @@ Every 2 ms (TIM6) the firmware:
 
 The robot falls over (fault `fall`) beyond 0.70 rad. A command expires after
 0.5 s, so a lost link stops the robot.
+
+The application control/estimator/driver code uses fixed-size state and buffers;
+no `malloc`, `calloc`, `realloc` or C++ `new` calls occur in those source paths.
+This is not a whole-library memory audit. A fixed tick and late-tick fault are
+not a worst-case execution-time proof: measured execution time and jitter under
+I2C/UART load remain to be published.
+
+### Model-to-firmware workflow
+
+The Python model is linearized about upright balance to design the LQR/LQI gains.
+`balancing_robot_sim.export_firmware_config` writes the gains, physical constants
+and limits into `robot_config_generated.h`; the control and estimator algorithms
+are hand-written C. Firmware host tests use mocked HAL and a simulated plant.
+They are software-in-the-loop tests, **not physical HIL or Simulink auto-coding**.
+Keep the STM32CubeIDE project under `STM32Code/`: moving it to `firmware/` would
+break toolchain/project paths without a deliberate migration.
 
 ### State estimation
 
@@ -282,3 +313,15 @@ python -m unittest discover -s teleop -p "test_*.py"
 ```
 
 The firmware host test is described above.
+The [CI workflow](.github/workflows/tests.yml) runs these regressions and checks
+the CubeMX hooks. It does not compile the ARM image or validate hardware timing.
+
+### Reproducing hardware results
+
+The published plots summarize two repetitions per estimator/feedback configuration.
+Position is wheel odometry, not independent ground truth, and acceleration RMS
+is a commanded-control-effort proxy. Raw logs and the metric-generation script
+are not included, so the hardware numbers cannot yet be independently recomputed.
+For the next dataset, archive firmware/configuration hashes, raw timestamped
+telemetry, reference trajectory, metric script and test conditions; add external
+position measurement and repeatable disturbance tests where possible.
