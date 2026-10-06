@@ -1,5 +1,6 @@
-# Author: Luca Obwegs
 # BalancingRobot
+
+Designed and built by Luca Obwegs.
 
 ![Control and estimator signal flow](docs/control-flow.svg)
 
